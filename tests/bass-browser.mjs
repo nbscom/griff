@@ -14,6 +14,7 @@ const scales={'Минорная пентатоника':[0,3,5,7,10,12],'Нат�
 try{
   await page.goto(base);await page.getByRole('button',{name:'Бас-гитара',exact:true}).click();
   const panel=page.locator('.bass-studies');
+  const inlineBoard=panel.getByRole('region',{name:'Интервал на басовом грифе',exact:true});
   assert.equal(await page.locator('.fret-string').count(),4);assert.equal(await page.locator('.fret-string').first().locator('.fret').count(),21);
   const tunings=[['standard',[43,38,33,28]],['drop-d',[43,38,33,26]],['eb',[42,37,32,27]]];
   for(const[id,open]of tunings){
@@ -22,6 +23,7 @@ try{
       await panel.getByRole('button',{name:label,exact:true}).click();await expect(page.getByLabel('Режим грифа')).toHaveValue('Интервалы');
       const displayed=await panel.locator('.bass-note-list strong').allTextContents();assert.deepEqual(displayed.map(toMidi),[root,root+semitones]);
       const expected=open.flatMap(m=>Array.from({length:21},(_,f)=>m+f)).filter(m=>m===root||m===root+semitones).sort((a,b)=>a-b);assert.deepEqual(await shownMidis(),expected,`${id}/${label}`);
+      await expect(inlineBoard).toBeVisible();const inlineNotes=await inlineBoard.locator('.bass-position:has(span)').evaluateAll(cells=>cells.map(cell=>cell.getAttribute('aria-label').split(', ')[2]));assert.deepEqual(inlineNotes.map(toMidi).sort((a,b)=>a-b),expected,`inline ${id}/${label}`);assert.equal(await inlineBoard.locator('.bass-board-row').count(),4);assert.equal(await inlineBoard.locator('.bass-board-row').first().locator('.bass-position').count(),21);
     }
     await page.getByLabel('Ступени',{exact:true}).check();assert.ok((await page.locator('.fret.interval-target span').allTextContents()).every(n=>n==='8'));assert.ok((await page.locator('.fret:not(.interval-target) span').allTextContents()).every(n=>n==='1'));
     await panel.getByRole('button',{name:'Прима',exact:true}).click();assert.equal(await page.locator('.fret.interval-target').count(),0);
@@ -41,7 +43,12 @@ try{
   await page.evaluate(()=>window.tones=[]);await panel.getByRole('button',{name:'Октава',exact:true}).click();await panel.locator('.bass-scales').getByRole('button',{name:'Мажор',exact:true}).click();assert.ok((await page.evaluate(()=>window.tones)).every(t=>t.cancelled));
   // Root search and changing the tonic via the shared fretboard stay in sync.
   await panel.getByRole('button',{name:'Найти тонику',exact:true}).click();await expect(page.getByLabel('Режим грифа')).toHaveValue('Только тоника');await page.getByLabel('Тоника',{exact:true}).selectOption('F♯');await expect(page.getByLabel('Тоника басового упражнения')).toHaveValue('F♯');
-  await panel.getByRole('button',{name:'Октава',exact:true}).click();await page.getByLabel('Ступени',{exact:true}).check();await panel.getByRole('button',{name:'Показать на грифе',exact:true}).click();await expect(page.locator('#fretboard')).toBeInViewport();await expect(page.locator('.fret.interval-target span').first()).toHaveText('8');
-  await mkdir('test-results',{recursive:true});await panel.screenshot({path:'test-results/bass-desktop.png'});await page.setViewportSize({width:390,height:844});await panel.scrollIntoViewIfNeeded();await page.screenshot({path:'test-results/bass-mobile.png'});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.deepEqual(errors,[]);
-  console.log('PASS: bass 4 strings/20 frets, 3 tunings × 7 intervals × 7 scales, actual MIDI highlights, octave degree 8, scheduled scale audio, stale-note cancellation, shared tonic and mobile');
+  await panel.getByRole('button',{name:'Октава',exact:true}).click();await page.getByLabel('Ступени',{exact:true}).check();await panel.getByRole('button',{name:'Полный гриф',exact:true}).click();await expect(page.locator('#fretboard')).toBeInViewport();await expect(page.locator('.fret.interval-target span').first()).toHaveText('8');
+  await mkdir('test-results',{recursive:true});await panel.screenshot({path:'test-results/bass-desktop.png'});await page.setViewportSize({width:390,height:844});await panel.scrollIntoViewIfNeeded();await page.screenshot({path:'test-results/bass-mobile.png'});
+  // Selecting an interval must reveal the actual board in place, without another button.
+  await page.getByLabel('Строй',{exact:true}).selectOption('drop-d');await page.getByLabel('Тоника басового упражнения').selectOption('D');await panel.getByRole('button',{name:'Кварта',exact:true}).click();await expect(inlineBoard).toBeInViewport();
+  const visibility=await inlineBoard.evaluate(element=>{const box=element.getBoundingClientRect();const cells=[...element.querySelectorAll('.bass-position:has(span)')];return {root:cells.some(cell=>cell.classList.contains('bass-position-root')&&cell.getBoundingClientRect().left>=box.left+42&&cell.getBoundingClientRect().right<=box.right),target:cells.some(cell=>cell.classList.contains('bass-position-target')&&cell.getBoundingClientRect().left>=box.left+42&&cell.getBoundingClientRect().right<=box.right)};});assert.ok(visibility.root&&visibility.target,JSON.stringify(visibility));
+  await page.evaluate(()=>window.tones=[]);await inlineBoard.locator('.bass-position-target').first().click();assert.equal((await page.evaluate(()=>window.tones)).length,1);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.deepEqual(errors,[]);
+  console.log('PASS: bass 4 strings/20 frets, 3 tunings × 7 intervals × 7 scales, actual MIDI highlights, octave degree 8, scheduled scale audio, stale-note cancellation, shared tonic, inline 20-fret board and mobile focus');
 }finally{await browser.close();}

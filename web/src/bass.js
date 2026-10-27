@@ -15,3 +15,15 @@ export function bassIntervalDegree(midi,study){
   return null;
 }
 export function semitoneLabel(value){return `${value} ${value===1?'полутон':value>=2&&value<=4?'полутона':'полутонов'}`;}
+export function bassIntervalPositions(tuning,study){
+  return tuning.midi.flatMap((open,string)=>Array.from({length:21},(_,fret)=>({string,fret,midi:open+fret}))).filter(position=>position.midi===study.tonic||position.midi===study.target);
+}
+export function closestBassIntervalPair(positions,study){
+  const roots=positions.filter(p=>p.midi===study.tonic),targets=positions.filter(p=>p.midi===study.target);
+  let best=null;
+  for(const root of roots)for(const target of targets){
+    const score=Math.abs(root.fret-target.fret)*100+Math.max(root.fret,target.fret)*5+Math.abs(root.string-target.string);
+    if(!best||score<best.score)best={root,target,score};
+  }
+  return best;
+}
