@@ -12,7 +12,7 @@ export function Tempo({bpm,setBpm,label='Темп'}){
 export function Metronome({bpm,setBpm,meter,setMeter}){
   const[running,setRunning]=useState(false),[beat,setBeat]=useState(-1),[tapCount,setTapCount]=useState(0);
   const taps=useRef([]);
-  useEffect(()=>{const stop=e=>{if(e.detail==='jam'||e.detail==='ear'){setRunning(false);setBeat(-1);}};window.addEventListener('griff:playback',stop);return()=>window.removeEventListener('griff:playback',stop);},[]);
+  useEffect(()=>{const stop=e=>{if(e.detail==='jam'||e.detail==='ear'||e.detail==='bass-study'){setRunning(false);setBeat(-1);}};window.addEventListener('griff:playback',stop);return()=>window.removeEventListener('griff:playback',stop);},[]);
   useEffect(()=>{if(!running)return;return startSequence({bpm,meter,onStep:setBeat});},[running,bpm,meter]);
   const count=meter==='3/4'?3:meter==='6/8'?6:4;
   function tap(){const now=performance.now();if(taps.current.length&&now-taps.current.at(-1)>2200)taps.current=[];taps.current.push(now);taps.current=taps.current.slice(-6);setTapCount(taps.current.length);if(taps.current.length>=2){const intervals=taps.current.slice(1).map((n,i)=>n-taps.current[i]);const average=intervals.reduce((a,b)=>a+b,0)/intervals.length;setBpm(Math.max(40,Math.min(220,Math.round(60000/average))));}}

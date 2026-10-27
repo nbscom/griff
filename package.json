@@ -8,7 +8,8 @@
     "build": "vite build && node scripts/publish-static.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test tests/*.test.js",
-    "test:browser": "node tests/browser.mjs"
+    "test:browser": "node tests/browser.mjs && node tests/bass-browser.mjs",
+    "test:bass": "node tests/bass-browser.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
