@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {chords,notes,solos} from '../src/music.js';
-import {tunings,chordVoicing,exerciseFor,frequency} from '../src/instruments.js';
+import {chords,notes,solos} from '../web/src/music.js';
+import {tunings,chordVoicing,exerciseFor,frequency} from '../web/src/instruments.js';
 const expected={ '':[0,4,7],m:[0,3,7],'7':[0,4,7,10],m7:[0,3,7,10],sus2:[0,2,7],sus4:[0,5,7],'5':[0,7] };
 for(const tuning of tunings.guitar)for(const name of Object.keys(chords))test(`${tuning.name}: ${name} has the correct sounding notes`,()=>{
   const match=name.match(/^([A-G]♯?)(.*)$/),root=notes.indexOf(match[1]);

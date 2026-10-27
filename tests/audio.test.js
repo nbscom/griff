@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {detectPitch} from '../src/audio/pitch.js';
-import {beatSeconds} from '../src/audio/sound.js';
+import {detectPitch} from '../web/src/audio/pitch.js';
+import {beatSeconds} from '../web/src/audio/sound.js';
 function signal(hz,sampleRate,kind='clean',amplitude=.2){return Float32Array.from({length:8192},(_,i)=>{const t=i/sampleRate;return amplitude*(Math.sin(2*Math.PI*hz*t)+(kind==='harmonic'?.65*Math.sin(4*Math.PI*hz*t)+.3*Math.sin(6*Math.PI*hz*t):0));});}
 for(const rate of [44100,48000,96000]){
   for(const hz of [36.7081,38.8909,41.2034,55,82.4069,110,196,329.6276,659.2551,1174.659]){
