@@ -3,7 +3,7 @@ import {ArrowRight,Volume2,Pause} from 'lucide-react';
 import {notes} from './music';
 import {scales,octaveName} from './instruments';
 import {bassIntervals,bassStudy,degreeNames,semitoneLabel} from './bass';
-import {previewNotes} from './audio/sound';
+import {previewNotes,soundContext} from './audio/sound';
 import {playbackStarted} from './audio/events';
 export function BassStudies({tuning,root,setRoot,mode,setMode,interval,setIntervalNote,clearExercise,onReveal}){
   const[request,setRequest]=useState(null);
@@ -15,7 +15,7 @@ export function BassStudies({tuning,root,setRoot,mode,setMode,interval,setInterv
   },[request,root,tuning,mode,interval]);
   useEffect(()=>{const stop=e=>{if(e.detail!=='bass-study')setRequest(null);};window.addEventListener('griff:playback',stop);return()=>window.removeEventListener('griff:playback',stop);},[]);
   function play(midis,newMode=mode,newInterval=interval){
-    playbackStarted('bass-study');setRequest({midis,root,tuning:tuning.id,mode:newMode,interval:newInterval});
+    soundContext();playbackStarted('bass-study');setRequest({midis,root,tuning:tuning.id,mode:newMode,interval:newInterval});
   }
   function selectInterval(value){
     clearExercise();setMode('Интервалы');setIntervalNote(value);
