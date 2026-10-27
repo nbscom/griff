@@ -11,7 +11,7 @@ npm ci --cache /workspace/.npm-cache
 npm run dev -- --port 5173
 ```
 
-Базовый путь приложения — `/griff/`. `npm run build` создаёт `dist`, `npm run preview -- --port 5174` запускает production-сборку.
+Базовый путь приложения — `/griff/`. `npm run build` создаёт `dist` и обновляет сгенерированные `index.html` и `assets/` в корне, `npm run preview -- --port 5174` запускает production-сборку.
 
 ## Инструменты и строй
 
@@ -41,4 +41,4 @@ npm run test:browser
 
 ## GitHub Pages
 
-Сайт: https://nbscom.github.io/griff/. Source в Settings → Pages — GitHub Actions. Workflow `.github/workflows/pages.yml` запускает тесты, сборку и публикацию при push в `main` или вручную из Actions. Аудиовход запрашивается по нажатию кнопки; разрешения управляются браузером.
+Сайт: https://nbscom.github.io/griff/. Текущий источник Pages — `main:/`. Исходный HTML хранится в `web/index.html`; корневой `index.html` и `assets/` генерируются командой `npm run build` и коммитятся вместе с кодом. Не редактируйте эти выходные файлы вручную. `.nojekyll` отключает обработку Jekyll. Workflow `.github/workflows/pages.yml` также запускает тесты и публикует идентичную сборку из `dist` при push в `main` или вручную из Actions. Оба способа публикации содержат одинаковые файлы приложения. Аудиовход запрашивается по нажатию кнопки; разрешения управляются браузером.
