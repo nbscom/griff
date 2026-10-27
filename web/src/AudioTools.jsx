@@ -2,6 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {Mic,RefreshCw,Power,Play,Pause} from 'lucide-react';
 import {openInput,inputError} from './audio/input';
 import {soundContext,startSequence} from './audio/sound';
+import {publishInput,playbackStarted} from './audio/events';
 import {frequency,octaveName} from './instruments';
 export function Tempo({bpm,setBpm,label='Темп'}){
   const[draft,setDraft]=useState(String(bpm));
@@ -11,10 +12,11 @@ export function Tempo({bpm,setBpm,label='Темп'}){
 export function Metronome({bpm,setBpm,meter,setMeter}){
   const[running,setRunning]=useState(false),[beat,setBeat]=useState(-1),[tapCount,setTapCount]=useState(0);
   const taps=useRef([]);
+  useEffect(()=>{const stop=e=>{if(e.detail==='jam'||e.detail==='ear'){setRunning(false);setBeat(-1);}};window.addEventListener('griff:playback',stop);return()=>window.removeEventListener('griff:playback',stop);},[]);
   useEffect(()=>{if(!running)return;return startSequence({bpm,meter,onStep:setBeat});},[running,bpm,meter]);
   const count=meter==='3/4'?3:meter==='6/8'?6:4;
   function tap(){const now=performance.now();if(taps.current.length&&now-taps.current.at(-1)>2200)taps.current=[];taps.current.push(now);taps.current=taps.current.slice(-6);setTapCount(taps.current.length);if(taps.current.length>=2){const intervals=taps.current.slice(1).map((n,i)=>n-taps.current[i]);const average=intervals.reduce((a,b)=>a+b,0)/intervals.length;setBpm(Math.max(40,Math.min(220,Math.round(60000/average))));}}
-  return <section className="panel metro-panel" id="metronome"><div className="section-top"><h3>Метроном</h3><span className="section-caption">{meter==='6/8'?'BPM · четверть с точкой':'BPM · четверть'}</span></div><div className="metro-controls"><Tempo bpm={bpm} setBpm={setBpm}/><select aria-label="Размер" value={meter} onChange={e=>setMeter(e.target.value)}><option>4/4</option><option>3/4</option><option>6/8</option></select><button className="tap-button" onClick={tap}>Tap tempo <span>{tapCount>0?tapCount:''}</span></button></div><div className="beat-lights" aria-label="Доли такта">{Array.from({length:count},(_,i)=><span key={i} className={(i===0?'accent ':'')+(running&&beat===i?'lit':'')}>{i+1}</span>)}</div><button className="primary metro-start" aria-pressed={running} onClick={()=>{soundContext();setRunning(!running);setBeat(-1);}}>{running?<Pause size={16}/>:<Play size={16}/>} {running?'Остановить метроном':'Включить метроном'}</button></section>;
+  return <section className="panel metro-panel" id="metronome"><div className="section-top"><h3>Метроном</h3><span className="section-caption">{meter==='6/8'?'BPM · четверть с точкой':'BPM · четверть'}</span></div><div className="metro-controls"><Tempo bpm={bpm} setBpm={setBpm}/><select aria-label="Размер" value={meter} onChange={e=>setMeter(e.target.value)}><option>4/4</option><option>3/4</option><option>6/8</option></select><button className="tap-button" onClick={tap}>Tap tempo <span>{tapCount>0?tapCount:''}</span></button></div><div className="beat-lights" aria-label="Доли такта">{Array.from({length:count},(_,i)=><span key={i} className={(i===0?'accent ':'')+(running&&beat===i?'lit':'')}>{i+1}</span>)}</div><button className="primary metro-start" aria-pressed={running} onClick={()=>{soundContext();if(!running)playbackStarted('metronome');setRunning(!running);setBeat(-1);}}>{running?<Pause size={16}/>:<Play size={16}/>} {running?'Остановить метроном':'Включить метроном'}</button></section>;
 }
 export function InputTuner({tuning}){
   const[devices,setDevices]=useState([]),[deviceId,setDeviceId]=useState(''),[status,setStatus]=useState('off'),[error,setError]=useState('');
@@ -23,10 +25,10 @@ export function InputTuner({tuning}){
   async function refresh(){try{const list=await navigator.mediaDevices?.enumerateDevices();setDevices((list||[]).filter(d=>d.kind==='audioinput'));}catch{setError('Не удалось получить список аудиоустройств.');}}
   useEffect(()=>{refresh();navigator.mediaDevices?.addEventListener('devicechange',refresh);return()=>{generation.current++;engine.current?.close();navigator.mediaDevices?.removeEventListener('devicechange',refresh);};},[]);
   useEffect(()=>{if(status!=='on')return;const id=setInterval(()=>setWaiting(Date.now()-lastSignal.current>2000),300);return()=>clearInterval(id);},[status]);
-  function disconnect(){generation.current++;engine.current?.close();engine.current=null;history.current=[];setStatus('off');setData({frequency:null,rms:0,peak:0});setWaiting(false);setDeviceName('');}
+  function disconnect(){publishInput({status:'off',frequency:null,rms:0});generation.current++;engine.current?.close();engine.current=null;history.current=[];setStatus('off');setData({frequency:null,rms:0,peak:0});setWaiting(false);setDeviceName('');}
   async function connect(id=deviceId){
     const current=++generation.current;engine.current?.close();engine.current=null;
-    setStatus('requesting');setError('');setData({frequency:null,rms:0,peak:0});history.current=[];
+    setStatus('requesting');publishInput({status:'requesting',frequency:null,rms:0});setError('');setData({frequency:null,rms:0,peak:0});history.current=[];
     try{
       const active=await openInput(id,measurement=>{
         if(current!==generation.current)return;
@@ -35,13 +37,13 @@ export function InputTuner({tuning}){
           history.current.push(measurement.frequency);history.current=history.current.slice(-3);
           const sorted=[...history.current].sort((a,b)=>a-b);measurement.frequency=sorted[Math.floor(sorted.length/2)];
         }else{measurement.frequency=null;history.current=[];}
-        setData(measurement);
+        setData(measurement);publishInput({...measurement,status:'on'});
       });
       if(current!==generation.current){active.close();return;}
-      engine.current=active;lastSignal.current=Date.now();setStatus('on');setWaiting(false);setDeviceName(active.track.label);
+      publishInput({status:'on',frequency:null,rms:0});engine.current=active;lastSignal.current=Date.now();setStatus('on');setWaiting(false);setDeviceName(active.track.label);
       active.track.onended=()=>{if(current===generation.current){disconnect();setError('Аудиоустройство отключено. Подключи его и выбери вход заново.');}};
       await refresh();
-    }catch(err){if(current===generation.current){setError(inputError(err));setStatus('off');}}
+    }catch(err){if(current===generation.current){setError(inputError(err));setStatus('off');publishInput({status:'off',frequency:null,rms:0});}}
   }
   const frequencyNow=data.frequency;
   const targetIndex=auto&&frequencyNow?tuning.midi.reduce((best,midi,i)=>Math.abs(1200*Math.log2(frequencyNow/frequency(midi)))<Math.abs(1200*Math.log2(frequencyNow/frequency(tuning.midi[best])))?i:best,0):Math.min(manual,tuning.midi.length-1);

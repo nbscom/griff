@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {chooseQuestion,matchPitch,clampLoop,rootMidi,chordIntervals,validSequence,validStats,emptyStats,loadLocal,saveLocal} from '../web/src/practice.js';
+import {tunings} from '../web/src/instruments.js';
+for(const instrument of ['guitar','bass'])for(const tuning of tunings[instrument])test(`${instrument}/${tuning.id}: note questions stay inside selected string/range`,()=>{
+  for(let s=0;s<tuning.midi.length;s++)for(const random of [()=>0,()=>.999999]){const q=chooseQuestion(tuning,{min:5,max:12,string:s,random,previous:tuning.midi[s]+5});assert.equal(q.string,s);assert.ok(q.fret>=5&&q.fret<=12);assert.equal(q.midi,tuning.midi[s]+q.fret);assert.notEqual(q.midi,tuning.midi[s]+5);}
+});
+test('Pitch answer rejects octaves, silence and an out-of-tune note',()=>{const e1=41.2034446;assert.ok(matchPitch(e1,28));assert.equal(matchPitch(e1*2,28),false);assert.equal(matchPitch(e1*2**(40/1200),28),false);for(const hz of [0,null,NaN,-10])assert.equal(matchPitch(hz,28),false);});
+test('A–B bounds stay ordered and within the exercise',()=>{assert.deepEqual(clampLoop(8,0,100),[1,8]);assert.deepEqual(clampLoop(8,7,2),[7,7]);assert.deepEqual(clampLoop(8,NaN,NaN),[1,8]);});
+test('Backing chord roots and chord qualities produce the requested harmony',()=>{assert.equal(rootMidi('E5',28),28);assert.equal(rootMidi('C♯m',28),37);assert.deepEqual(chordIntervals('Bm'),[0,3,7]);assert.deepEqual(chordIntervals('E7'),[0,4,7,10]);assert.deepEqual(chordIntervals('Dsus2'),[0,2,7]);});
+test('Saved progressions reject bad chord names, lengths and durations',()=>{assert.ok(validSequence([{chord:'Em',bars:4}]));for(const bad of [[],null,[{chord:'oops',bars:1}],[{chord:'Em',bars:0}],[{chord:'Em',bars:1.5}],Array.from({length:17},()=>({chord:'Em',bars:1}))])assert.equal(validSequence(bad),false);});
+test('Stats reject forged negative counts or accuracy above 100%',()=>{assert.ok(validStats(emptyStats()));assert.equal(validStats({...emptyStats(),notes:{total:1,correct:2,ms:100}}),false);assert.equal(validStats({...emptyStats(),notes:{total:-1,correct:0,ms:100}}),false);});
+test('Corrupted and unavailable localStorage do not break practice',()=>{const original=globalThis.localStorage;try{globalThis.localStorage={getItem:()=>'{broken',setItem:()=>{throw Error('quota');}};assert.deepEqual(loadLocal('key',emptyStats(),validStats),emptyStats());assert.equal(saveLocal('key',{}),false);globalThis.localStorage={getItem:()=>JSON.stringify({bad:true})};assert.deepEqual(loadLocal('key',emptyStats(),validStats),emptyStats());}finally{globalThis.localStorage=original;}});

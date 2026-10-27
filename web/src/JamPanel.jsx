@@ -1,0 +1,31 @@
+import React,{useEffect,useState} from 'react';
+import {Play,Pause,Plus,ArrowLeft,ArrowRight,X,Star} from 'lucide-react';
+import {chords} from './music';
+import {Tempo} from './AudioTools';
+import {presets,validSequence,loadLocal,saveLocal} from './practice';
+import {startBacking} from './audio/backing';
+import {playbackStarted} from './audio/events';
+import {soundContext} from './audio/sound';
+const validFavorites=value=>Array.isArray(value)&&value.length<=12&&value.every(v=>v&&typeof v.name==='string'&&v.name.length<=60&&validSequence(v.sequence)&&Number.isFinite(v.bpm)&&v.bpm>=40&&v.bpm<=220&&['4/4','3/4','6/8'].includes(v.meter));
+export function JamPanel({bpm,setBpm,meter,setMeter,instrument}){
+  const[sequence,setSequence]=useState(()=>presets[0].sequence),[running,setRunning]=useState(false),[position,setPosition]=useState(null);
+  const[tracks,setTracks]=useState({drums:true,bass:instrument!=='bass',chords:true});
+  const[favorites,setFavorites]=useState(()=>loadLocal('griff:favorites:v1',[],validFavorites)),[name,setName]=useState(''),[message,setMessage]=useState('');
+  useEffect(()=>{setTracks(t=>({...t,bass:instrument!=='bass'}));setRunning(false);setPosition(null);},[instrument]);
+  useEffect(()=>{if(!running)return;return startBacking({sequence,bpm,meter,tracks,onPosition:setPosition});},[running,sequence,bpm,meter,tracks]);
+  useEffect(()=>{const stop=e=>{if(e.detail!=='jam'){setRunning(false);setPosition(null);}};window.addEventListener('griff:playback',stop);return()=>window.removeEventListener('griff:playback',stop);},[]);
+  useEffect(()=>{const append=e=>{if(!Object.hasOwn(chords,e.detail))return;setRunning(false);setSequence(s=>{if(s.length>=16){setMessage('Максимум 16 аккордов. Удали один, чтобы добавить новый.');return s;}return[...s,{chord:e.detail,bars:1}];});};window.addEventListener('griff:add-chord',append);return()=>window.removeEventListener('griff:add-chord',append);},[]);
+  function update(index,patch){setSequence(s=>s.map((item,i)=>i===index?{...item,...patch}:item));setPosition(null);}
+  function move(index,delta){setSequence(s=>{const value=[...s];[value[index],value[index+delta]]=[value[index+delta],value[index]];return value;});}
+  function save(){
+    if(favorites.length>=12){setMessage('Можно сохранить до 12 последовательностей. Удали одну из избранного.');return;}
+    const next=[...favorites,{name:name.trim().slice(0,60)||sequence.map(item=>item.chord).join(' → ').slice(0,60),sequence,bpm,meter}];
+    if(saveLocal('griff:favorites:v1',next)){setFavorites(next);setName('');setMessage('Сохранено в этом браузере.');}else setMessage('Браузер запретил сохранение. Аккомпанемент доступен без избранного.');
+  }
+  function load(value){const saved=value.startsWith('saved:')?favorites[Number(value.slice(6))]:presets[Number(value)];if(!saved)return;setRunning(false);setPosition(null);setSequence(saved.sequence.map(item=>({...item})));if(saved.bpm)setBpm(saved.bpm);if(saved.meter)setMeter(saved.meter);setMessage('');}
+  return <section className="panel jam-panel" id="jam"><div className="section-top"><div><h3>Играть под аккомпанемент</h3><p className="section-caption">Ударные, бас и аккорды · синтезированный звук · {meter}</p></div><select aria-label="Заготовка аккомпанемента" defaultValue="" onChange={e=>{load(e.target.value);e.target.value='';}}><option value="" disabled>Выбрать последовательность</option>{presets.map((p,i)=><option key={i} value={i}>{p.name}</option>)}{favorites.map((p,i)=><option key={'saved'+i} value={'saved:'+i}>★ {p.name}</option>)}</select></div>
+    <div className="progression-editor">{sequence.map((item,i)=><div className={'progression-item '+(running&&position?.index===i?'playing-chord':'')} key={i}><div className="progression-order"><span>{i+1}</span><button title={`Удалить аккорд ${i+1}`} disabled={sequence.length===1} onClick={()=>{setSequence(s=>s.filter((_,n)=>n!==i));setPosition(null);}}><X size={13}/></button></div><select aria-label={`Аккорд ${i+1}`} value={item.chord} onChange={e=>update(i,{chord:e.target.value})}>{Object.keys(chords).map(key=><option key={key}>{key}</option>)}</select><label>Такты <select aria-label={`Такты аккорда ${i+1}`} value={item.bars} onChange={e=>update(i,{bars:Number(e.target.value)})}>{[1,2,3,4].map(n=><option key={n}>{n}</option>)}</select></label><div className="progression-order"><button disabled={i===0} title={`Сдвинуть аккорд ${i+1} влево`} onClick={()=>move(i,-1)}><ArrowLeft size={13}/></button><button disabled={i===sequence.length-1} title={`Сдвинуть аккорд ${i+1} вправо`} onClick={()=>move(i,1)}><ArrowRight size={13}/></button></div></div>)}<button className="add-chord" title="Добавить аккорд" disabled={sequence.length>=16} onClick={()=>setSequence(s=>[...s,{chord:'Em',bars:1}])}><Plus size={20}/></button></div>
+    <div className="jam-controls"><Tempo bpm={bpm} setBpm={setBpm} label="Темп аккомпанемента"/><div className="track-switches">{[['drums','Ударные'],['bass','Бас'],['chords','Аккорды']].map(([id,label])=><label key={id}><input type="checkbox" checked={tracks[id]} onChange={e=>setTracks(t=>({...t,[id]:e.target.checked}))}/>{label}</label>)}</div><button className="primary" onClick={()=>{soundContext();if(!running)playbackStarted('jam');setRunning(!running);setPosition(null);}}>{running?<Pause size={16}/>:<Play size={16}/>} {running?'Остановить аккомпанемент':'Играть по кругу'}</button>{running&&<span className="section-caption">{position?`${sequence[position.index]?.chord} · такт ${position.bar+1}`:'Старт…'}</span>}</div>
+    <div className="save-progression"><input aria-label="Название последовательности" placeholder="Название для избранного" maxLength="60" value={name} onChange={e=>setName(e.target.value)}/><button className="secondary" onClick={save}><Star size={13}/> Сохранить</button><span role="status" className="section-caption">{message}</span></div>{favorites.length>0&&<div className="saved-progressions">{favorites.map((p,i)=><span key={i}><button onClick={()=>load('saved:'+i)}>★ {p.name}</button><button title={`Удалить избранное ${p.name}`} onClick={()=>{const next=favorites.filter((_,n)=>n!==i);if(saveLocal('griff:favorites:v1',next))setFavorites(next);else setMessage('Не удалось обновить избранное.');}}><X size={12}/></button></span>)}</div>}
+  </section>;
+}
