@@ -52,5 +52,5 @@ export function exerciseFor(instrument, id, tuning) {
   const pattern=exercise.pattern.map(([s,f])=>[s,f+(s===low?dropOffset:0)]);
   const transpose=tuning.id==='eb'||tuning.id==='drop-cs' ? -1 : 0;
   const root=notes[(notes.indexOf(exercise.root)+transpose+12)%12];
-  return { ...exercise, pattern, root, hint:exercise.id==='bend' ? `Сначала сыграй ${octaveName(tuning.midi[1]+12)} на 12-м ладу второй струны. Затем подтяни 10-й лад на тон до той же высоты. В примере звучит целевая высота бенда.` : exercise.hint, title:exercise.id==='pent' ? `Пентатоника ${root}m` : exercise.title };
+  return { ...exercise, pattern, root, hint:instrument==='bass'&&exercise.id==='phrase' ? exercise.hint.replace('на A',`на ${root}`) : instrument==='bass'&&exercise.id==='cross' ? `Корень на струне ${noteName(tuning.midi[3])} → октава на струне ${noteName(tuning.midi[1])}. Глуши пропущенную струну ${noteName(tuning.midi[2])}.` : exercise.id==='bend' ? `Сначала сыграй ${octaveName(tuning.midi[1]+12)} на 12-м ладу второй струны. Затем подтяни 10-й лад на тон до той же высоты. В примере звучит целевая высота бенда.` : exercise.hint, title:exercise.id==='pent' ? `Пентатоника ${root}m` : exercise.title };
 }
